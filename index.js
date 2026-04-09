@@ -13,7 +13,15 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  const item = new URL(req.url, 'http://localhost').searchParams.get('item');
+  const params = new URL(req.url, 'http://localhost').searchParams;
+  const item = params.get('item');
+
+  if (!item) {
+    res.writeHead(400);
+    res.end(JSON.stringify({ error: 'item parameter required' }));
+    return;
+  }
+
   const url = `https://erpcoe.c.erpnext.com/api/resource/Bin?filters=[["item_code","=","${item}"]]&fields=["item_code","warehouse","actual_qty"]`;
 
   const options = {
