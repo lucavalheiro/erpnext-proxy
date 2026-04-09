@@ -1,46 +1,276 @@
 const https = require('https');
 const http = require('http');
-
 const PORT = process.env.PORT || 3000;
+
+const ERP_HOST = 'erpcoe.c.erpnext.com';
+const ERP_TOKEN = 'token 5eeeb697cabb58b:15a1c848d2a25f1';
+
+function erpGet(path, cb) {
+  https.get({ hostname: ERP_HOST, path: path, headers: { Authorization: ERP_TOKEN } }, (r) => {
+    let d = '';
+    r.on('data', c => d += c);
+    r.on('end', () => cb(null, JSON.parse(d)));
+  }).on('error', cb);
+}
+
+function erpPost(path, body, cb) {
+  const data = JSON.stringify(body);
+  const req = https.request({
+    hostname: ERP_HOST, path: path, method: 'POST',
+    headers: { Authorization: ERP_TOKEN, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+  }, (r) => {
+    let d = '';
+    r.on('data', c => d += c);
+    r.on('end', () => cb(null, JSON.parse(d)));
+  });
+  req.on('error', cb);
+  req.write(data);
+  req.end();
+}
+
+const HTML = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ERPi Store</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f7f8fa;min-height:100vh}
+.header{background:#0062ff;color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.header h1{font-size:20px;font-weight:500}
+.cart-btn{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px}
+.cart-count{background:#fff;color:#0062ff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.main{max-width:960px;margin:0 auto;padding:24px}
+.section-title{font-size:16px;font-weight:500;color:#161616;margin-bottom:12px}
+.customer-select{width:100%;padding:10px 14px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;background:#fff;margin-bottom:24px;color:#161616}
+.products{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:16px;margin-bottom:32px}
+.product-card{background:#fff;border:1.5px solid #e0e0e0;border-radius:12px;padding:16px;cursor:pointer;transition:border-color 0.15s,background 0.15s}
+.product-card:hover{border-color:#0062ff}
+.product-card.selected{border:2px solid #0062ff;background:#f0f4ff}
+.product-icon{font-size:32px;margin-bottom:10px}
+.product-name{font-size:14px;font-weight:500;color:#161616;margin-bottom:2px}
+.product-sku{font-size:11px;color:#888;margin-bottom:6px}
+.product-price{font-size:15px;font-weight:700;color:#0062ff}
+.product-stock{font-size:11px;margin-top:3px}
+.stock-ok{color:#198038}.stock-neg{color:#da1e28}
+.qty-control{display:flex;align-items:center;gap:6px;margin-top:10px}
+.qty-btn{width:28px;height:28px;border:1px solid #e0e0e0;border-radius:6px;background:#f4f4f4;cursor:pointer;font-size:16px;line-height:1;color:#161616}
+.qty-btn:hover{background:#e0e0e0}
+.qty-input{width:36px;text-align:center;border:1px solid #e0e0e0;border-radius:6px;padding:4px;font-size:13px;color:#161616}
+.cart-section{background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:20px;margin-bottom:20px}
+.cart-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f4f4f4}
+.cart-item:last-child{border-bottom:none}
+.cart-total{display:flex;justify-content:space-between;font-size:16px;font-weight:700;padding-top:14px;color:#161616;border-top:1.5px solid #e0e0e0;margin-top:8px}
+.btn-primary{background:#0062ff;color:#fff;border:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:500;cursor:pointer;width:100%;margin-top:4px}
+.btn-primary:hover{background:#0043ce}
+.btn-primary:disabled{background:#c6c6c6;cursor:not-allowed}
+.empty-cart{color:#888;font-size:13px;text-align:center;padding:16px}
+.badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;background:#e6f1fb;color:#0c447c;margin-left:8px}
+.remove-btn{background:none;border:none;color:#da1e28;cursor:pointer;font-size:16px;padding:0 4px;line-height:1}
+.success-box{background:#defbe6;border:1px solid #a7f0ba;border-radius:8px;padding:14px 16px;color:#198038;font-size:14px;margin-top:12px}
+.error-box{background:#fff1f1;border:1px solid #ffd7d9;border-radius:8px;padding:14px 16px;color:#da1e28;font-size:14px;margin-top:12px}
+.loading{color:#0062ff;font-size:14px;margin-top:12px;text-align:center}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>ERPi Store</h1>
+  <button class="cart-btn" onclick="document.getElementById('cartSection').scrollIntoView({behavior:'smooth'})">
+    Carrinho <span class="cart-count" id="cartCount">0</span>
+  </button>
+</div>
+<div class="main">
+  <p class="section-title">Cliente</p>
+  <select class="customer-select" id="customer" onchange="updateBtn()">
+    <option value="">Selecione o cliente...</option>
+    <option>Grant Plastics Ltd.</option>
+    <option>Palmer Productions Ltd.</option>
+    <option>West View Software Ltd.</option>
+  </select>
+
+  <p class="section-title">Produtos</p>
+  <div class="products" id="products"><p style="color:#888;font-size:14px">Carregando...</p></div>
+
+  <div class="cart-section" id="cartSection">
+    <p class="section-title">Carrinho <span class="badge" id="cartBadge">0 itens</span></p>
+    <div id="cartItems"><p class="empty-cart">Nenhum item adicionado.</p></div>
+    <div id="cartTotal" style="display:none" class="cart-total">
+      <span>Total</span><span id="totalValue">R$ 0,00</span>
+    </div>
+  </div>
+
+  <button class="btn-primary" id="btnOrder" onclick="criarOrdem()" disabled>Criar Sales Order no ERPNext</button>
+  <div id="status"></div>
+</div>
+
+<script>
+var items=[];var cart={};
+
+fetch('/api/items').then(r=>r.json()).then(function(d){
+  items=d;renderProducts();
+});
+
+function fmt(n){return'R$ '+Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+function renderProducts(){
+  var html='';
+  items.forEach(function(p){
+    var inCart=cart[p.sku]?cart[p.sku].qty:0;
+    var sel=inCart>0?'selected':'';
+    html+='<div class="product-card '+sel+'" id="card-'+p.sku+'">';
+    html+='<div class="product-icon">'+p.icon+'</div>';
+    html+='<div class="product-name">'+p.name+'</div>';
+    html+='<div class="product-sku">'+p.sku+'</div>';
+    html+='<div class="product-price">'+fmt(p.price)+'</div>';
+    html+='<div class="product-stock '+(p.stock>0?'stock-ok':'stock-neg')+'">'+(p.stock>0?'Estoque: '+p.stock:'Sem estoque')+'</div>';
+    html+='<div class="qty-control">';
+    html+='<button class="qty-btn" onclick="changeQty(\''+p.sku+'\',-1)">-</button>';
+    html+='<input class="qty-input" id="qty-'+p.sku+'" value="'+(inCart||0)+'" readonly/>';
+    html+='<button class="qty-btn" onclick="changeQty(\''+p.sku+'\',1)">+</button>';
+    html+='</div></div>';
+  });
+  document.getElementById('products').innerHTML=html;
+}
+
+function changeQty(sku,delta){
+  var item=items.find(function(i){return i.sku===sku;});
+  var cur=cart[sku]?cart[sku].qty:0;
+  var nw=Math.max(0,cur+delta);
+  if(nw===0)delete cart[sku];
+  else cart[sku]={sku:sku,name:item.name,price:item.price,qty:nw};
+  renderProducts();renderCart();
+}
+
+function renderCart(){
+  var keys=Object.keys(cart);
+  document.getElementById('cartCount').textContent=keys.length;
+  document.getElementById('cartBadge').textContent=keys.length+' iten'+(keys.length!==1?'s':'');
+  if(!keys.length){
+    document.getElementById('cartItems').innerHTML='<p class="empty-cart">Nenhum item adicionado.</p>';
+    document.getElementById('cartTotal').style.display='none';
+    updateBtn();return;
+  }
+  var total=0;var html='';
+  keys.forEach(function(k){
+    var c=cart[k];var sub=c.price*c.qty;total+=sub;
+    html+='<div class="cart-item">';
+    html+='<div><div style="font-size:14px;font-weight:500;color:#161616">'+c.name+'</div>';
+    html+='<div style="font-size:12px;color:#888">'+c.qty+' x '+fmt(c.price)+'</div></div>';
+    html+='<div style="display:flex;align-items:center;gap:10px">';
+    html+='<span style="font-weight:500;font-size:14px;color:#161616">'+fmt(sub)+'</span>';
+    html+='<button class="remove-btn" onclick="removeItem(\''+k+'\')">x</button>';
+    html+='</div></div>';
+  });
+  document.getElementById('cartItems').innerHTML=html;
+  document.getElementById('totalValue').textContent=fmt(total);
+  document.getElementById('cartTotal').style.display='flex';
+  updateBtn();
+}
+
+function removeItem(sku){delete cart[sku];renderProducts();renderCart();}
+
+function updateBtn(){
+  var keys=Object.keys(cart);
+  document.getElementById('btnOrder').disabled=!document.getElementById('customer').value||!keys.length;
+}
+
+function criarOrdem(){
+  var customer=document.getElementById('customer').value;
+  if(!customer||!Object.keys(cart).length)return;
+  document.getElementById('status').innerHTML='<p class="loading">Criando ordem no ERPNext...</p>';
+  document.getElementById('btnOrder').disabled=true;
+  var payload={customer:customer,items:Object.keys(cart).map(function(k){return{sku:cart[k].sku,qty:cart[k].qty,price:cart[k].price};})};
+  fetch('/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.success){
+        document.getElementById('status').innerHTML='<div class="success-box">Ordem criada com sucesso! <strong>'+d.order_id+'</strong></div>';
+        cart={};renderProducts();renderCart();
+      }else{
+        document.getElementById('status').innerHTML='<div class="error-box">Erro: '+d.error+'</div>';
+        document.getElementById('btnOrder').disabled=false;
+      }
+    }).catch(function(e){
+      document.getElementById('status').innerHTML='<div class="error-box">Erro: '+e.message+'</div>';
+      document.getElementById('btnOrder').disabled=false;
+    });
+}
+</script>
+</body>
+</html>`;
+
+function parseBody(req, cb) {
+  let d = '';
+  req.on('data', c => d += c);
+  req.on('end', () => { try { cb(JSON.parse(d)); } catch(e) { cb({}); } });
+}
 
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', '*');
+  if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
+  const url = new URL(req.url, 'http://localhost');
+
+  if (url.pathname === '/' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(HTML);
     return;
   }
 
-  const params = new URL(req.url, 'http://localhost').searchParams;
-  const item = params.get('item');
-
-  if (!item) {
-    res.writeHead(400);
-    res.end(JSON.stringify({ error: 'item parameter required' }));
-    return;
-  }
-
-  const url = `https://erpcoe.c.erpnext.com/api/resource/Bin?filters=[["item_code","=","${item}"]]&fields=["item_code","warehouse","actual_qty"]`;
-
-  const options = {
-    headers: {
-      'Authorization': 'token 5eeeb697cabb58b:15a1c848d2a25f1'
-    }
-  };
-
-  https.get(url, options, (erpRes) => {
-    let data = '';
-    erpRes.on('data', chunk => data += chunk);
-    erpRes.on('end', () => {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(data);
+  if (url.pathname === '/api/items' && req.method === 'GET') {
+    const icons = {SKU001:'👕',SKU002:'💻',SKU003:'📚',SKU004:'📱',SKU005:'👟',SKU006:'☕',SKU007:'📺',SKU008:'🎒',SKU009:'🎧',SKU010:'📷'};
+    erpGet('/api/resource/Item Price?fields=["item_code","item_name","price_list_rate"]&filters=[["price_list","=","Standard Selling"]]&limit=20', (err, priceData) => {
+      if (err) { res.writeHead(500); res.end(JSON.stringify({error:err.message})); return; }
+      erpGet('/api/resource/Bin?fields=["item_code","actual_qty"]&filters=[["warehouse","=","Stores - ECD"]]&limit=20', (err2, stockData) => {
+        const stockMap = {};
+        if (!err2 && stockData.data) stockData.data.forEach(s => stockMap[s.item_code] = s.actual_qty);
+        const names = {SKU001:'T-shirt',SKU002:'Laptop',SKU003:'Book',SKU004:'Smartphone',SKU005:'Sneakers',SKU006:'Coffee Mug',SKU007:'Television',SKU008:'Backpack',SKU009:'Headphones',SKU010:'Camera'};
+        const items = priceData.data.map(p => ({
+          sku: p.item_code,
+          name: names[p.item_code] || p.item_code,
+          price: p.price_list_rate,
+          stock: stockMap[p.item_code] || 0,
+          icon: icons[p.item_code] || '📦'
+        }));
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(items));
+      });
     });
-  }).on('error', (e) => {
-    res.writeHead(500);
-    res.end(JSON.stringify({ error: e.message }));
-  });
+    return;
+  }
+
+  if (url.pathname === '/order' && req.method === 'POST') {
+    parseBody(req, (body) => {
+      const today = new Date().toISOString().split('T')[0];
+      const order = {
+        doctype: 'Sales Order',
+        customer: body.customer,
+        delivery_date: today,
+        selling_price_list: 'Standard Selling',
+        items: body.items.map(i => ({
+          item_code: i.sku,
+          qty: i.qty,
+          rate: i.price,
+          delivery_date: today,
+          warehouse: 'Stores - ECD'
+        }))
+      };
+      erpPost('/api/resource/Sales Order', order, (err, data) => {
+        if (err) { res.writeHead(500); res.end(JSON.stringify({success:false,error:err.message})); return; }
+        if (data.data && data.data.name) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({success:true, order_id:data.data.name}));
+        } else {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({success:false, error: JSON.stringify(data)}));
+        }
+      });
+    });
+    return;
+  }
+
+  res.writeHead(404); res.end('Not found');
 });
 
-server.listen(PORT, () => console.log(`Proxy rodando na porta ${PORT}`));
+server.listen(PORT, () => console.log('ERPi Store rodando na porta ' + PORT));
