@@ -249,7 +249,7 @@ const server = http.createServer((req, res) => {
     const icons = {SKU001:'👕',SKU002:'💻',SKU003:'📚',SKU004:'📱',SKU005:'👟',SKU006:'☕',SKU007:'📺',SKU008:'🎒',SKU009:'🎧',SKU010:'📷'};
     const names = {SKU001:'T-shirt',SKU002:'Laptop',SKU003:'Book',SKU004:'Smartphone',SKU005:'Sneakers',SKU006:'Coffee Mug',SKU007:'Television',SKU008:'Backpack',SKU009:'Headphones',SKU010:'Camera'};
 
-    const priceUrl = '/api/resource/Item%20Price?fields=["item_code","item_name","price_list_rate"]&filters=[["price_list","=","' + PRICE_LIST + '"]]&limit=20';
+    const priceUrl = '/api/resource/Item%20Price?fields=%5B%22item_code%22%2C%22item_name%22%2C%22price_list_rate%22%5D&filters=%5B%5B%22price_list%22%2C%22%3D%22%2C%22' + encodeURIComponent(PRICE_LIST) + '%22%5D%5D&limit=20';
 
     erpGet(priceUrl, (err, priceData) => {
       if (err) { res.writeHead(200,{'Content-Type':'application/json'}); res.end(JSON.stringify({error:'Erro precos: '+err.message})); return; }
@@ -257,7 +257,7 @@ const server = http.createServer((req, res) => {
       const prices = (priceData && priceData.data) ? priceData.data : [];
       if (!prices.length) { res.writeHead(200,{'Content-Type':'application/json'}); res.end(JSON.stringify({error:'Nenhum item na Price List.'})); return; }
 
-      const stockUrl = '/api/resource/Bin?fields=["item_code","actual_qty"]&filters=[["warehouse","=","' + WAREHOUSE + '"]]&limit=50';
+      const stockUrl = '/api/resource/Bin?fields=%5B%22item_code%22%2C%22actual_qty%22%5D&filters=%5B%5B%22warehouse%22%2C%22%3D%22%2C%22' + encodeURIComponent(WAREHOUSE) + '%22%5D%5D&limit=50';
       erpGet(stockUrl, (err2, stockData) => {
         const stockMap = {};
         if (!err2 && stockData && stockData.data) stockData.data.forEach(s => { stockMap[s.item_code] = s.actual_qty; });
