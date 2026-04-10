@@ -3,14 +3,35 @@ const http  = require('http');
 const PORT  = process.env.PORT || 3000;
 
 const ERP_HOST   = 'erpcoe.c.erpnext.com';
-const ERP_TOKEN  = 'token 24bf9fbe2836d84:6dfb74226cd0e61';
+const ERP_TOKEN  = 'token 5eeeb697cabb58b:15a1c848d2a25f1';
 const WAREHOUSE  = 'Stores - ECD';
 const PRICE_LIST = 'Standard Selling';
 
+// encodeURI garante que [], "" e outros chars sejam encodados
+// split/join preserva a / e ? e & que nao devem ser encodados
+function safePath(path) {
+  return path.split('').map(function(c) {
+    if (/[^A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]/.test(c)) {
+      return encodeURIComponent(c);
+    }
+    return c;
+  }).join('');
+}
+
+// Versao simples: substitui apenas os chars problemáticos
+function encodePath(path) {
+  return path
+    .replace(/\[/g, '%5B')
+    .replace(/\]/g, '%5D')
+    .replace(/"/g, '%22')
+    .replace(/ /g, '%20');
+}
+
 function erpGet(path, cb) {
+  const safed = encodePath(path);
   https.get({
     hostname: ERP_HOST,
-    path: path,
+    path: safed,
     headers: { Authorization: ERP_TOKEN }
   }, (r) => {
     let d = '';
@@ -24,9 +45,10 @@ function erpGet(path, cb) {
 
 function erpPost(path, body, cb) {
   const data = JSON.stringify(body);
+  const safed = encodePath(path);
   const req = https.request({
     hostname: ERP_HOST,
-    path: path,
+    path: safed,
     method: 'POST',
     headers: {
       Authorization: ERP_TOKEN,
@@ -46,7 +68,6 @@ function erpPost(path, body, cb) {
   req.end();
 }
 
-// HTML montado com concatenacao de strings — sem backtick, sem conflito de aspas
 const HTML = '<!DOCTYPE html>' +
 '<html lang="pt-BR"><head>' +
 '<meta charset="UTF-8"/>' +
@@ -90,12 +111,9 @@ const HTML = '<!DOCTYPE html>' +
 '.error-box{background:#fff1f1;border:1px solid #ffd7d9;border-radius:8px;padding:14px 16px;color:#da1e28;font-size:14px;margin-top:12px}' +
 '.loading{color:#0062ff;font-size:14px;margin-top:12px;text-align:center}' +
 '</style></head><body>' +
-
-'<div class="header">' +
-'<h1>ERPi Store</h1>' +
+'<div class="header"><h1>ERPi Store</h1>' +
 '<button class="cart-btn" id="btnCart">Carrinho <span class="cart-count" id="cartCount">0</span></button>' +
 '</div>' +
-
 '<div class="main">' +
 '<p class="section-title">Cliente</p>' +
 '<select class="customer-select" id="customer">' +
@@ -114,31 +132,21 @@ const HTML = '<!DOCTYPE html>' +
 '<button class="btn-primary" id="btnOrder" disabled>Criar Sales Order no ERPNext</button>' +
 '<div id="status"></div>' +
 '</div>' +
-
 '<script>' +
 'var items=[];var cart={};' +
-
-'document.getElementById("btnCart").addEventListener("click",function(){' +
-'  document.getElementById("cartSection").scrollIntoView({behavior:"smooth"});' +
-'});' +
+'document.getElementById("btnCart").addEventListener("click",function(){document.getElementById("cartSection").scrollIntoView({behavior:"smooth"});});' +
 'document.getElementById("customer").addEventListener("change",updateBtn);' +
 'document.getElementById("btnOrder").addEventListener("click",criarOrdem);' +
-
 'fetch("/api/items").then(function(r){return r.json();}).then(function(d){' +
 '  if(d.error){document.getElementById("products").innerHTML="<p style=\'color:#da1e28;font-size:13px\'>Erro: "+d.error+"</p>";return;}' +
 '  items=d;renderProducts();' +
-'}).catch(function(e){' +
-'  document.getElementById("products").innerHTML="<p style=\'color:#da1e28;font-size:13px\'>Falha: "+e.message+"</p>";' +
-'});' +
-
+'}).catch(function(e){document.getElementById("products").innerHTML="<p style=\'color:#da1e28;font-size:13px\'>Falha: "+e.message+"</p>";});' +
 'function fmt(n){return"R$ "+Number(n).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});}' +
-
 'function renderProducts(){' +
-'  if(!items.length){document.getElementById("products").innerHTML="<p style=\'color:#888;font-size:14px\'>Nenhum produto encontrado.</p>";return;}' +
+'  if(!items.length){document.getElementById("products").innerHTML="<p style=\'color:#888\'>Nenhum produto.</p>";return;}' +
 '  var h="";' +
 '  items.forEach(function(p){' +
-'    var q=cart[p.sku]?cart[p.sku].qty:0;' +
-'    var s=q>0?" selected":"";' +
+'    var q=cart[p.sku]?cart[p.sku].qty:0;var s=q>0?" selected":"";' +
 '    h+="<div class=\'product-card"+s+"\' id=\'card-"+p.sku+"\'>"' +
 '      +"<div class=\'product-icon\'>"+p.icon+"</div>"' +
 '      +"<div class=\'product-name\'>"+p.name+"</div>"' +
@@ -153,31 +161,19 @@ const HTML = '<!DOCTYPE html>' +
 '  });' +
 '  var el=document.getElementById("products");' +
 '  el.innerHTML=h;' +
-'  el.onclick=function(e){' +
-'    var b=e.target.closest("[data-sku]");' +
-'    if(b)changeQty(b.getAttribute("data-sku"),parseInt(b.getAttribute("data-d")));' +
-'  };' +
+'  el.onclick=function(e){var b=e.target.closest("[data-sku]");if(b)changeQty(b.getAttribute("data-sku"),parseInt(b.getAttribute("data-d")));};' +
 '}' +
-
 'function changeQty(sku,delta){' +
-'  var item=items.find(function(i){return i.sku===sku;});' +
-'  if(!item)return;' +
-'  var cur=cart[sku]?cart[sku].qty:0;' +
-'  var nw=Math.max(0,cur+delta);' +
-'  if(nw===0)delete cart[sku];' +
-'  else cart[sku]={sku:sku,name:item.name,price:item.price,qty:nw};' +
+'  var item=items.find(function(i){return i.sku===sku;});if(!item)return;' +
+'  var cur=cart[sku]?cart[sku].qty:0;var nw=Math.max(0,cur+delta);' +
+'  if(nw===0)delete cart[sku];else cart[sku]={sku:sku,name:item.name,price:item.price,qty:nw};' +
 '  renderProducts();renderCart();' +
 '}' +
-
 'function renderCart(){' +
 '  var keys=Object.keys(cart);' +
 '  document.getElementById("cartCount").textContent=keys.length;' +
 '  document.getElementById("cartBadge").textContent=keys.length+" iten"+(keys.length!==1?"s":"");' +
-'  if(!keys.length){' +
-'    document.getElementById("cartItems").innerHTML="<p class=\'empty-cart\'>Nenhum item adicionado.</p>";' +
-'    document.getElementById("cartTotal").style.display="none";' +
-'    updateBtn();return;' +
-'  }' +
+'  if(!keys.length){document.getElementById("cartItems").innerHTML="<p class=\'empty-cart\'>Nenhum item adicionado.</p>";document.getElementById("cartTotal").style.display="none";updateBtn();return;}' +
 '  var total=0;var h="";' +
 '  keys.forEach(function(k){' +
 '    var c=cart[k];var sub=c.price*c.qty;total+=sub;' +
@@ -191,19 +187,12 @@ const HTML = '<!DOCTYPE html>' +
 '  });' +
 '  var ci=document.getElementById("cartItems");' +
 '  ci.innerHTML=h;' +
-'  ci.onclick=function(e){' +
-'    var b=e.target.closest("[data-remove]");' +
-'    if(b){delete cart[b.getAttribute("data-remove")];renderProducts();renderCart();}' +
-'  };' +
+'  ci.onclick=function(e){var b=e.target.closest("[data-remove]");if(b){delete cart[b.getAttribute("data-remove")];renderProducts();renderCart();}};' +
 '  document.getElementById("totalValue").textContent=fmt(total);' +
 '  document.getElementById("cartTotal").style.display="flex";' +
 '  updateBtn();' +
 '}' +
-
-'function updateBtn(){' +
-'  document.getElementById("btnOrder").disabled=!document.getElementById("customer").value||!Object.keys(cart).length;' +
-'}' +
-
+'function updateBtn(){document.getElementById("btnOrder").disabled=!document.getElementById("customer").value||!Object.keys(cart).length;}' +
 'function criarOrdem(){' +
 '  var customer=document.getElementById("customer").value;' +
 '  if(!customer||!Object.keys(cart).length)return;' +
@@ -211,19 +200,11 @@ const HTML = '<!DOCTYPE html>' +
 '  document.getElementById("btnOrder").disabled=true;' +
 '  var payload={customer:customer,items:Object.keys(cart).map(function(k){return{sku:cart[k].sku,qty:cart[k].qty,price:cart[k].price};})};' +
 '  fetch("/order",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})' +
-'  .then(function(r){return r.json();})' +
+'  .then(function(r){return r.json();})'  +
 '  .then(function(d){' +
-'    if(d.success){' +
-'      document.getElementById("status").innerHTML="<div class=\'success-box\'>Sales Order criado: <strong>"+d.order_id+"</strong></div>";' +
-'      cart={};renderProducts();renderCart();' +
-'    }else{' +
-'      document.getElementById("status").innerHTML="<div class=\'error-box\'>Erro: "+d.error+"</div>";' +
-'      document.getElementById("btnOrder").disabled=false;' +
-'    }' +
-'  }).catch(function(e){' +
-'    document.getElementById("status").innerHTML="<div class=\'error-box\'>Falha: "+e.message+"</div>";' +
-'    document.getElementById("btnOrder").disabled=false;' +
-'  });' +
+'    if(d.success){document.getElementById("status").innerHTML="<div class=\'success-box\'>Sales Order criado: <strong>"+d.order_id+"</strong></div>";cart={};renderProducts();renderCart();}' +
+'    else{document.getElementById("status").innerHTML="<div class=\'error-box\'>Erro: "+d.error+"</div>";document.getElementById("btnOrder").disabled=false;}' +
+'  }).catch(function(e){document.getElementById("status").innerHTML="<div class=\'error-box\'>Falha: "+e.message+"</div>";document.getElementById("btnOrder").disabled=false;});' +
 '}' +
 '</script></body></html>';
 
@@ -236,7 +217,6 @@ function parseBody(req, cb) {
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
-
   const url = new URL(req.url, 'http://localhost');
 
   if (url.pathname === '/' && req.method === 'GET') {
@@ -249,19 +229,26 @@ const server = http.createServer((req, res) => {
     const icons = {SKU001:'👕',SKU002:'💻',SKU003:'📚',SKU004:'📱',SKU005:'👟',SKU006:'☕',SKU007:'📺',SKU008:'🎒',SKU009:'🎧',SKU010:'📷'};
     const names = {SKU001:'T-shirt',SKU002:'Laptop',SKU003:'Book',SKU004:'Smartphone',SKU005:'Sneakers',SKU006:'Coffee Mug',SKU007:'Television',SKU008:'Backpack',SKU009:'Headphones',SKU010:'Camera'};
 
-    const priceUrl = '/api/resource/Item%20Price?fields=%5B%22item_code%22%2C%22item_name%22%2C%22price_list_rate%22%5D&filters=%5B%5B%22price_list%22%2C%22%3D%22%2C%22' + encodeURIComponent(PRICE_LIST) + '%22%5D%5D&limit=20';
+    // URLs com chars literais — encodePath() cuida do encoding dentro do erpGet
+    const priceUrl = '/api/resource/Item Price?fields=["item_code","item_name","price_list_rate"]&filters=[["price_list","=","' + PRICE_LIST + '"]]&limit=20';
 
     erpGet(priceUrl, (err, priceData) => {
-      if (err) { res.writeHead(200,{'Content-Type':'application/json'}); res.end(JSON.stringify({error:'Erro precos: '+err.message})); return; }
-
+      if (err) {
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({error:'Erro precos: '+err.message}));
+        return;
+      }
       const prices = (priceData && priceData.data) ? priceData.data : [];
-      if (!prices.length) { res.writeHead(200,{'Content-Type':'application/json'}); res.end(JSON.stringify({error:'Nenhum item na Price List.'})); return; }
-
-      const stockUrl = '/api/resource/Bin?fields=%5B%22item_code%22%2C%22actual_qty%22%5D&filters=%5B%5B%22warehouse%22%2C%22%3D%22%2C%22' + encodeURIComponent(WAREHOUSE) + '%22%5D%5D&limit=50';
+      if (!prices.length) {
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({error:'Nenhum item na Price List.'}));
+        return;
+      }
+      const stockUrl = '/api/resource/Bin?fields=["item_code","actual_qty"]&filters=[["warehouse","=","' + WAREHOUSE + '"]]&limit=50';
       erpGet(stockUrl, (err2, stockData) => {
         const stockMap = {};
         if (!err2 && stockData && stockData.data) stockData.data.forEach(s => { stockMap[s.item_code] = s.actual_qty; });
-        const items = prices.map(p => ({
+        const result = prices.map(p => ({
           sku:   p.item_code,
           name:  names[p.item_code] || p.item_name || p.item_code,
           price: p.price_list_rate || 0,
@@ -269,7 +256,7 @@ const server = http.createServer((req, res) => {
           icon:  icons[p.item_code] || '📦'
         }));
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify(items));
+        res.end(JSON.stringify(result));
       });
     });
     return;
@@ -278,8 +265,8 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/order' && req.method === 'POST') {
     parseBody(req, (body) => {
       if (!body.customer || !body.items || !body.items.length) {
-        res.writeHead(400,{'Content-Type':'application/json'});
-        res.end(JSON.stringify({success:false,error:'customer e items obrigatorios.'}));
+        res.writeHead(400, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({success:false, error:'customer e items obrigatorios.'}));
         return;
       }
       const deliveryDate = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
@@ -294,15 +281,19 @@ const server = http.createServer((req, res) => {
         }))
       };
       console.log('[/order]', JSON.stringify(order));
-      erpPost('/api/resource/Sales%20Order', order, (err, data) => {
-        if (err) { res.writeHead(500,{'Content-Type':'application/json'}); res.end(JSON.stringify({success:false,error:err.message})); return; }
+      erpPost('/api/resource/Sales Order', order, (err, data) => {
+        if (err) {
+          res.writeHead(500, {'Content-Type':'application/json'});
+          res.end(JSON.stringify({success:false, error:err.message}));
+          return;
+        }
         console.log('[/order] resp:', JSON.stringify(data).slice(0,300));
         if (data.data && data.data.name) {
-          res.writeHead(200,{'Content-Type':'application/json'});
+          res.writeHead(200, {'Content-Type':'application/json'});
           res.end(JSON.stringify({success:true, order_id:data.data.name}));
         } else {
           const errMsg = data.exception || (typeof data.message==='string'?data.message:null) || data._server_messages || JSON.stringify(data).slice(0,300);
-          res.writeHead(200,{'Content-Type':'application/json'});
+          res.writeHead(200, {'Content-Type':'application/json'});
           res.end(JSON.stringify({success:false, error:errMsg}));
         }
       });
