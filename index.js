@@ -91,9 +91,7 @@ function erpPost(path, body, cb) {
   );
 
   req.on('error', cb);
-
   req.write(data);
-
   req.end();
 }
 
@@ -124,12 +122,7 @@ const HTML = `
 <title>ERPi Store</title>
 
 <style>
-
-*{
-  box-sizing:border-box;
-  margin:0;
-  padding:0
-}
+*{box-sizing:border-box;margin:0;padding:0}
 
 body{
   font-family:Arial,sans-serif;
@@ -404,7 +397,6 @@ body{
   margin-top:12px;
   text-align:center
 }
-
 </style>
 </head>
 
@@ -471,13 +463,11 @@ body{
 </div>
 
 <script>
-
 var items = [];
 var cart  = {};
 
 document.getElementById("btnCart")
 .addEventListener("click", function() {
-
   document
   .getElementById("cartSection")
   .scrollIntoView({behavior:"smooth"});
@@ -496,24 +486,18 @@ fetch("/api/items")
   return r.json();
 })
 .then(function(d){
-
   if(d.error){
-
     document.getElementById("products").innerHTML =
       "<p style='color:#da1e28;font-size:13px'>Erro: "
       + d.error +
       "</p>";
-
     return;
   }
 
   items = d;
-
   renderProducts();
-
 })
 .catch(function(e){
-
   document.getElementById("products").innerHTML =
     "<p style='color:#da1e28;font-size:13px'>Falha: "
     + e.message +
@@ -521,7 +505,6 @@ fetch("/api/items")
 });
 
 function fmt(n){
-
   return "R$ " +
     Number(n).toLocaleString(
       "pt-BR",
@@ -533,19 +516,15 @@ function fmt(n){
 }
 
 function renderProducts(){
-
   if(!items.length){
-
     document.getElementById("products").innerHTML =
       "<p style='color:#888'>Nenhum produto.</p>";
-
     return;
   }
 
   var h = "";
 
   items.forEach(function(p){
-
     var q = cart[p.sku]
       ? cart[p.sku].qty
       : 0;
@@ -607,11 +586,9 @@ function renderProducts(){
   el.innerHTML = h;
 
   el.onclick = function(e){
-
     var b = e.target.closest("[data-sku]");
 
     if(b){
-
       changeQty(
         b.getAttribute("data-sku"),
         parseInt(
@@ -623,7 +600,6 @@ function renderProducts(){
 }
 
 function changeQty(sku, delta){
-
   var item = items.find(function(i){
     return i.sku === sku;
   });
@@ -637,11 +613,8 @@ function changeQty(sku, delta){
   var nw = Math.max(0, cur + delta);
 
   if(nw === 0){
-
     delete cart[sku];
-
   } else {
-
     cart[sku] = {
       sku: sku,
       name: item.name,
@@ -651,12 +624,10 @@ function changeQty(sku, delta){
   }
 
   renderProducts();
-
   renderCart();
 }
 
 function renderCart(){
-
   var keys = Object.keys(cart);
 
   document.getElementById("cartCount")
@@ -667,7 +638,6 @@ function renderCart(){
       keys.length + " itens";
 
   if(!keys.length){
-
     document.getElementById("cartItems")
       .innerHTML =
         "<p class='empty-cart'>Nenhum item adicionado.</p>";
@@ -676,18 +646,14 @@ function renderCart(){
       .style.display = "none";
 
     updateBtn();
-
     return;
   }
 
   var total = 0;
-
   var h = "";
 
   keys.forEach(function(k){
-
     var c = cart[k];
-
     var sub = c.price * c.qty;
 
     total += sub;
@@ -729,17 +695,14 @@ function renderCart(){
   ci.innerHTML = h;
 
   ci.onclick = function(e){
-
     var b = e.target.closest("[data-remove]");
 
     if(b){
-
       delete cart[
         b.getAttribute("data-remove")
       ];
 
       renderProducts();
-
       renderCart();
     }
   };
@@ -754,7 +717,6 @@ function renderCart(){
 }
 
 function updateBtn(){
-
   document.getElementById("btnOrder")
     .disabled =
       !document.getElementById("customer").value ||
@@ -762,7 +724,6 @@ function updateBtn(){
 }
 
 function criarOrdem(){
-
   var customer =
     document.getElementById("customer").value;
 
@@ -776,13 +737,10 @@ function criarOrdem(){
     .disabled = true;
 
   var payload = {
-
     customer: customer,
 
     items: Object.keys(cart).map(function(k){
-
       return {
-
         sku: cart[k].sku,
         qty: cart[k].qty,
         price: cart[k].price
@@ -791,7 +749,6 @@ function criarOrdem(){
   };
 
   fetch("/order", {
-
     method: "POST",
 
     headers: {
@@ -799,17 +756,12 @@ function criarOrdem(){
     },
 
     body: JSON.stringify(payload)
-
   })
   .then(function(r){
-
     return r.json();
-
   })
   .then(function(d){
-
     if(d.success){
-
       document.getElementById("status").innerHTML =
         "<div class='success-box'>Sales Order criado: <strong>"
         + d.order_id +
@@ -818,11 +770,9 @@ function criarOrdem(){
       cart = {};
 
       renderProducts();
-
       renderCart();
 
     } else {
-
       document.getElementById("status").innerHTML =
         "<div class='error-box'>Erro: "
         + d.error +
@@ -831,10 +781,8 @@ function criarOrdem(){
       document.getElementById("btnOrder")
         .disabled = false;
     }
-
   })
   .catch(function(e){
-
     document.getElementById("status").innerHTML =
       "<div class='error-box'>Falha: "
       + e.message +
@@ -844,7 +792,40 @@ function criarOrdem(){
       .disabled = false;
   });
 }
+</script>
 
+<div id="root"
+     style="
+       position:fixed;
+       bottom:20px;
+       right:20px;
+       z-index:99999;
+     ">
+</div>
+
+<script>
+  window.wxOConfiguration = {
+    orchestrationID: "20250515-0817-2486-8019-c55acc2aa9da_20250515-1932-5868-002f-259f7ce4a770",
+    hostURL: "https://dl.watson-orchestrate.ibm.com",
+    rootElementID: "root",
+    chatOptions: {
+      agentId: "273fc857-f91f-4e5f-9d2f-354658b38b9a"
+    }
+  };
+
+  setTimeout(function () {
+    const script = document.createElement('script');
+
+    script.src =
+      window.wxOConfiguration.hostURL +
+      "/wxochat/wxoLoader.js?embed=true";
+
+    script.addEventListener('load', function () {
+      wxoLoader.init();
+    });
+
+    document.head.appendChild(script);
+  }, 0);
 </script>
 
 </body>
@@ -863,11 +844,8 @@ const server = http.createServer((req, res) => {
   );
 
   if(req.method === 'OPTIONS'){
-
     res.writeHead(200);
-
     res.end();
-
     return;
   }
 
@@ -934,7 +912,6 @@ const server = http.createServer((req, res) => {
     erpGet(priceUrl, (err, priceData) => {
 
       if(err){
-
         res.writeHead(200,{
           'Content-Type':'application/json'
         });
@@ -955,7 +932,6 @@ const server = http.createServer((req, res) => {
           : [];
 
       if(!prices.length){
-
         res.writeHead(200,{
           'Content-Type':'application/json'
         });
@@ -983,14 +959,12 @@ const server = http.createServer((req, res) => {
            stockData.data){
 
           stockData.data.forEach((s)=>{
-
             stockMap[s.item_code] =
-              s.actual_qty;
+              Number(String(s.actual_qty).replace(',', '.')) || 0;
           });
         }
 
         const result = prices.map((p)=>({
-
           sku: p.item_code,
 
           name:
@@ -1056,11 +1030,8 @@ const server = http.createServer((req, res) => {
         .split('T')[0];
 
       const order = {
-
         doctype:'Sales Order',
-
         company: COMPANY,
-
         customer: body.customer,
 
         transaction_date:
@@ -1069,21 +1040,14 @@ const server = http.createServer((req, res) => {
           .split('T')[0],
 
         delivery_date: deliveryDate,
-
-        selling_price_list:
-          PRICE_LIST,
+        selling_price_list: PRICE_LIST,
 
         items:
           body.items.map((i)=>({
-
             item_code:i.sku,
-
             qty:i.qty,
-
             rate:i.price,
-
             delivery_date:deliveryDate,
-
             warehouse:WAREHOUSE
           }))
       };
@@ -1099,7 +1063,6 @@ const server = http.createServer((req, res) => {
         (err, data)=>{
 
           if(err){
-
             res.writeHead(500,{
               'Content-Type':'application/json'
             });
@@ -1134,7 +1097,6 @@ const server = http.createServer((req, res) => {
             );
 
           } else {
-
             const errMsg =
               data.exception ||
               data.message ||
@@ -1164,7 +1126,6 @@ const server = http.createServer((req, res) => {
   ===================== */
 
   res.writeHead(404);
-
   res.end('Not found');
 });
 
